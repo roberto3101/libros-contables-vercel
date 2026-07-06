@@ -171,6 +171,100 @@ ORDER=['030800','030900','031100','031200','031300']
 def code_block(txt):
     return '<pre class="code"><code>'+e(txt)+'</code></pre>'
 
+# ---- explicacion especifica por linea (rama "Despues") ----
+import re as _re
+ALIAS_EXPL = {
+ "periodo_tributario":"Campo 1 (Periodo). Concatena '00' como día a la columna existente d.periodo (YYYYMM) para formar AAAAMMDD, formato exigido por SUNAT para estos libros. d.periodo se lee tal cual; solo el alias es nuevo.",
+ "codigo_unico_operacion":"Campo 2 (CUO). Expone la columna existente d.cuo, llave única del asiento contable en el software. Debe ser idéntica a la del Libro Diario para que SUNAT cruce ambos libros.",
+ "correlativo_asiento_contable":"Campo 3 (Correlativo). Expone d.amc; su primer carácter es A (apertura), M (movimiento del mes) o C (cierre). El layout pide un único correlativo, por eso no se arrastra la columna 'correlativo' aparte.",
+ "tipo_documento_identidad_emisor":"Campo 4. Tipo de documento del emisor del título (Tabla 2). ISNULL(c.idtipodocidentidad,'0'): usa el tipo almacenado en zg_auxiliares; '0' si no hay contraparte.",
+ "numero_documento_identidad_emisor":"Campo 5. Nº de documento del emisor. ISNULL(c.rucdni,'0'): número del auxiliar; '0' cuando no existe.",
+ "razon_social_emisor":"Campo 6. Razón social del emisor. Recorta a 100 y elimina | / \\ y tabs/saltos (Regla General 2.0) para que ningún carácter rompa el registro en palotes.",
+ "codigo_tipo_titulo":"Campo 7. Tipo de título (Tabla 15). Valor fijo '00' porque el sistema no almacena el tipo de título — marcado TODO: confirmar fuente con Rubí/Vivian.",
+ "valor_nominal_unitario_titulo":"Campo 8. Valor nominal unitario del título. Fijo 0.00: sin fuente en el sistema (TODO).",
+ "cantidad_titulos":"Campo 9. Cantidad de títulos. Fijo 0: sin fuente en el sistema (TODO).",
+ "costo_total_titulos_en_libros":"Campo 10. Costo total en libros. SUM(debe−haber) agrupado por asiento = saldo deudor de la cuenta 30 (activo, positivo). convert(decimal(18,2)) fija 2 decimales; ISNULL evita nulos si el grupo queda vacío.",
+ "provision_total_titulos_en_libros":"Campo 11. Provisión total (debe ser negativa o 0.00). Fijo 0.00: sin fuente de la provisión de títulos (TODO).",
+ "estado_operacion":"Campo estado. case: conserva 1/8/9 si d.estado_sunat ya trae un valor válido; si viene nulo o 0, fuerza '1' (operación del periodo), correcto para un saldo de cierre. Nunca emite un valor fuera de 1/8/9.",
+ "campo_libre_utilizacion":"Campo de libre utilización. Se deja en '' y NO se emite en el TXT (regla SUNAT: los campos libres sin uso no llevan ni dato ni palote); solo aparece en la vista Excel.",
+ "fecha_inicio_operacion":"Campo 4. Fecha de inicio de la operación. convert(varchar, d.fecha_contable, 103) la formatea a DD/MM/AAAA. (Se usa fecha_contable como proxy de inicio; punto a confirmar.)",
+ "codigo_cuenta_contable":"Campo cuenta contable. Expone d.idcuenta (código de la cuenta al máximo nivel de dígitos). Columna existente; se lee tal cual.",
+ "descripcion_intangible":"Campo 6. Descripción del intangible. Toma af.descripcion (join a ct_activo_fijo), la recorta a 40 y elimina | / \\ y saltos (Regla 2.0).",
+ "valor_contable_intangible":"Campo 7. Valor contable del intangible. af.valor_activo_mna con 2 decimales.",
+ "amortizacion_contable_acumulada":"Campo 8. Amortización acumulada (debe ser negativa o 0.00). Fijo 0.00: falta confirmar la fuente real (cuenta 39 asociada o un campo de ct_activo_fijo) — TODO.",
+ "codigo_trabajador":"Campo 7. Código interno del trabajador. ax.codigo desde zg_auxiliares.",
+ "apellidos_nombres_trabajador":"Campo 8. Apellidos y nombres del trabajador. ax.razonsocial recortado a 100 y saneado de | / \\ y saltos (Regla 2.0).",
+ "saldo_final_por_pagar":"Campo 9. Saldo final. SUM(haber−debe) agrupado por asiento → saldo acreedor del pasivo en POSITIVO, como exige el layout (el código original daba negativo).",
+ "tipo_documento_identidad_trabajador":"Campo 5. Tipo de documento del trabajador (Tabla 2). ax.idtipodocidentidad tomado de zg_auxiliares tal cual.",
+ "numero_documento_identidad_trabajador":"Campo 6. Nº de documento del trabajador. ax.rucdni desde zg_auxiliares.",
+ "tipo_documento_identidad_proveedor":"Campo 4. Tipo de documento del proveedor (Tabla 2). ax.idtipodocidentidad desde zg_proveedores.",
+ "numero_documento_identidad_proveedor":"Campo 5. Nº de documento del proveedor. ax.rucdni desde zg_proveedores.",
+ "fecha_emision_comprobante":"Campo fecha de emisión del comprobante. convert(varchar, d.fecha_contable, 103) → DD/MM/AAAA.",
+ "razon_social_proveedor":"Campo 7. Razón social del proveedor. ax.razonsocial recortado a 100 y saneado de | / \\ y saltos (Regla 2.0).",
+ "monto_cuenta_por_pagar":"Campo 8. Monto por pagar. SUM(haber−debe) por asiento → saldo del pasivo en POSITIVO (el original daba negativo).",
+ "tipo_documento_identidad_tercero":"Campo 4. Tipo de documento del tercero (Tabla 2). ax.idtipodocidentidad.",
+ "numero_documento_identidad_tercero":"Campo 5. Nº de documento del tercero. ax.rucdni.",
+ "apellidos_nombres_tercero":"Campo 7. Apellidos y nombres del tercero. ax.razonsocial recortado a 100 y saneado (Regla 2.0).",
+ "monto_pendiente_pago_tercero":"Campo 9. Monto pendiente de pago al tercero. SUM(haber−debe) por asiento → positivo.",
+}
+def explain_line(raw, acc):
+    s=raw.strip()
+    low=s.lower()
+    if s=="": return None
+    if low.startswith("else if @accion"):
+        return f"Cabecera de la rama. Cuando el SP se invoca con @Accion='{acc}' se ejecuta este libro; el resto del procedimiento (los otros ~40 libros) no corre."
+    if s=="begin": return "Abre el bloque de la rama."
+    if s=="end": return "Cierra el bloque de la rama."
+    if low.startswith("into #"): return "Materializa el resultado en una tabla temporal por sesión (segura en concurrencia). Desde ella salen tanto el TXT como el Excel sin repetir el JOIN/GROUP BY."
+    if s==") t": return "Cierra la subconsulta que agrupó los movimientos por asiento."
+    if low.startswith("if @exportar_excel"): return "Bifurca la salida según el check: 0 = TXT oficial en palotes; 1 = Excel de revisión."
+    if s=="else": return "Rama alternativa: se pidió la salida Excel."
+    if low.startswith("select concat("): return "Salida OFICIAL (TXT): concatena los campos separados por '|' (palote) en el orden del layout. Termina en el estado; los campos libres no se incluyen (regla SUNAT)."
+    if low.startswith("from #inv_balances"): return "Lee la tabla temporal y ordena por CUO/correlativo/cuenta para una salida estable."
+    if low.startswith("group by"): return "Agrupa por periodo, asiento (CUO y correlativo) y contraparte para consolidar los movimientos del diario en un saldo por documento. Las columnas de agrupación son columnas existentes del diario."
+    if low.startswith("where"):
+        cuentas=_re.findall(r"like '(\d+)%'", s)
+        cta = " y ".join(cuentas) if cuentas else "la cuenta del libro"
+        return (f"Filtra por empresa, año contable y periodo, y por la(s) cuenta(s) {cta} con LIKE (predicado SARGable que sí puede usar índice, "
+                f"a diferencia de left(idcuenta,2)='{cuentas[0] if cuentas else 'NN'}' que impedía el índice).")
+    if low.startswith("from ct_diarios"):
+        if "left join zg_auxiliares" in low: j="LEFT JOIN a zg_auxiliares para la razón social y documento del emisor; es LEFT porque la inversión puede no tener contraparte registrada."
+        elif "inner join ct_activo_fijo" in low: j="INNER JOIN a ct_activo_fijo para traer la descripción y el valor contable del intangible."
+        elif "inner join zg_auxiliares" in low: j="INNER JOIN a zg_auxiliares para los datos del trabajador."
+        elif "inner join zg_proveedores" in low: j="INNER JOIN a zg_proveedores para la razón social del proveedor/tercero."
+        else: j="unido a la tabla de la contraparte."
+        return "Fuente de datos: el Libro Diario (ct_diarios). "+j
+    # linea de proyeccion Excel:  alias as [(NN) ...]
+    mx=_re.match(r'(?:select\s+)?([a-z_]+)\s+as\s+\[\(', s)
+    if mx:
+        al=mx.group(1)
+        base=ALIAS_EXPL.get(al,"")
+        pre="Inicia la proyección de la vista Excel. " if low.startswith("select ") else ""
+        return f"{pre}Vista Excel: expone «{al}» con encabezado legible (NN) para revisión; no se envía a SUNAT. "+base
+    # primera linea de la subconsulta (abre FROM y define periodo)
+    if s.startswith("from (") and "as periodo_tributario" in s:
+        return "Abre la subconsulta que arma y agrupa los datos. "+ALIAS_EXPL["periodo_tributario"]
+    # lista de columnas del temporal
+    if low.startswith("select ") and " as " not in low and "concat(" not in low:
+        return "Declara, en el orden exacto del layout SUNAT, las columnas de salida que se materializan en la tabla temporal."
+    # linea de campo de la subconsulta:  <expr> as <alias>
+    ma=_re.search(r'\bas\s+([a-z_]+)\b', s)
+    if ma:
+        al=ma.group(1)
+        if al in ALIAS_EXPL: return ALIAS_EXPL[al]
+    return "Línea de la consulta que arma este libro."
+
+def code_block_lines(txt, acc):
+    out=['<pre class="code"><code>']
+    for raw in txt.split('\n'):
+        if raw.strip()=='':
+            out.append('<span class="cline"> </span>'); continue
+        tip=explain_line(raw, acc)
+        if tip: out.append(f'<span class="cline" data-tip="{e(tip)}">{e(raw)}</span>')
+        else:   out.append(f'<span class="cline">{e(raw)}</span>')
+    out.append('</code></pre>')
+    return ''.join(out)
+
 def fields_html(acc):
     out=['<div class="fields">']
     for num,lbl,desc in F[acc]:
@@ -217,8 +311,9 @@ def section(acc):
       <button class="seg-btn is-active" data-code="after" aria-pressed="true">Después</button>
       <button class="seg-btn" data-code="before" aria-pressed="false">Antes</button>
     </div>
+    <p class="code-hint">Pasa el cursor sobre cada línea del código «Después» para ver qué hace y por qué está ahí.</p>
     <div class="code-wrap" data-show="after">
-      <div class="code-side" data-code="after">{code_block(AFT[acc])}</div>
+      <div class="code-side" data-code="after">{code_block_lines(AFT[acc], acc)}</div>
       <div class="code-side" data-code="before" hidden>{code_block(BEF[acc])}</div>
     </div>
   </div>
@@ -328,7 +423,11 @@ h1{{font-family:var(--serif);font-weight:600;font-size:clamp(28px,4vw,44px);line
 .seg-btn.is-active{{background:var(--accent);color:#fff}}
 .seg-btn:first-child.is-active{{background:var(--accent)}}
 .code-wrap[data-show="before"] .seg-btn:first-child{{}}
-.code{{margin:0;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.7;tab-size:2;white-space:pre}}
+.code{{margin:0;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:14px 6px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.7;tab-size:2;white-space:pre}}
+.cline{{display:block;padding:0 14px;border-left:2px solid transparent;cursor:help}}
+.cline[data-tip]:hover{{background:rgba(127,217,200,.14);border-left-color:var(--code-dim)}}
+.code-hint{{font-size:11.5px;color:var(--ink-soft);margin:0 0 7px;display:flex;align-items:center;gap:6px}}
+.code-hint::before{{content:"";width:14px;height:14px;border-radius:3px;background:rgba(11,110,99,.18);border-left:2px solid var(--accent);flex:0 0 auto}}
 .code-side[data-code="before"] .code{{box-shadow:inset 4px 0 0 var(--before)}}
 .code-side[data-code="after"] .code{{box-shadow:inset 4px 0 0 var(--accent)}}
 
