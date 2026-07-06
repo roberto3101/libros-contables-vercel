@@ -448,9 +448,7 @@ footer b{{color:var(--ink)}}
   <h1>Libro 3 — Inventarios y Balances</h1>
   <p class="lede">Cinco formatos del procedimiento <code>Ct_Pro_PLE</code> (BD <code>CodeplexWeb_2020</code>): implementación, comparación antes / después y campos de salida documentados. Cada rama genera el archivo oficial en palotes y su equivalente en Excel para revisión.</p>
   <div class="status">
-    <span class="pill ok"><span class="dot"></span>Probado en SQL Server · todas las aserciones OK</span>
-    <span class="pill ok"><span class="dot"></span>Cambio quirúrgico · diff verificado</span>
-    <span class="pill"><span class="dot" style="background:var(--warn)"></span>4 puntos de negocio por confirmar</span>
+    <span class="pill"><span class="dot" style="background:var(--warn)"></span>Puntos de negocio por confirmar</span>
   </div>
   <div class="downloads">{downloads}</div>
 </div></div>
@@ -460,7 +458,6 @@ footer b{{color:var(--ink)}}
   <div class="overview">
     <div class="ov"><h4>Salida dual</h4><p><span class="k">@exportar_excel=0</span> → TXT en palotes (oficial SUNAT). <span class="k">=1</span> → Excel con columnas <span class="k">(NN)</span> para revisar.</p></div>
     <div class="ov"><h4>Patrón</h4><p>Tabla temporal por rama + <span class="k">if/else</span>, siguiendo el modelo ya validado de <span class="k">030700</span>. Temporales por sesión = seguros en concurrencia.</p></div>
-    <div class="ov"><h4>Criterio senior</h4><p>Predicados SARGables (<span class="k">like '30%'</span>), signo correcto en pasivos, <span class="k">ISNULL</span> en sumas, estado 1/8/9, saneo de CR/LF/TAB, solo lectura.</p></div>
     <div class="ov"><h4>Periodo &amp; estado</h4><p>Periodo en <span class="k">AAAAMMDD</span> (día 00). Estado: 1 del periodo · 8 anterior no anotada · 9 anterior anotada.</p></div>
   </div>
 </div>
@@ -470,11 +467,8 @@ footer b{{color:var(--ink)}}
 <div class="wrap">{sections}</div>
 
 <div class="wrap"><footer>
-  <div class="section-lead" style="padding-top:6px"><h2 style="font-size:20px">Verificación</h2></div>
-  <div class="grid2">
-    <div><b>Probado, correcto y seguro para producción.</b> Ejecución real en SQL Server (LocalDB) con datos de casos borde: conteo de campos por formato, signos, fechas DD/MM/AAAA, periodo AAAAMMDD, <code>SUM</code> por asiento, estado nulo→1 y 8 preservado, exclusión de ruido, y razón social con CR/LF/TAB que no parte el registro. Todo el procedimiento pasa <code>SET PARSEONLY</code> y el diff confirma que sólo cambiaron estas 5 ramas.</div>
-    <div><b>Pendiente de negocio (no son bugs).</b> 3.8: título/valor nominal/cantidad/provisión sin fuente en el sistema. 3.9: fuente real de la amortización acumulada. 3.11–3.13: confirmar que el Libro Diario es la fuente correcta (vs. cuentas corrientes). 3.13: contraparte proveedor/cliente/auxiliar. Y validar un periodo real contra el validador PLE de SUNAT.</div>
-  </div>
+  <div class="section-lead" style="padding-top:6px"><h2 style="font-size:20px">Pendiente de confirmar</h2></div>
+  <p style="max-width:74ch">3.8: código de título, valor nominal, cantidad y provisión — sin fuente en el sistema. 3.9: fuente real de la amortización acumulada. 3.11–3.13: confirmar si la fuente es el Libro Diario o Cuentas Corrientes. 3.13: contraparte proveedor / cliente / auxiliar. Validación final del archivo con el validador PLE de SUNAT usando el RUC y un periodo reales.</p>
 </footer></div>
 
 <div id="tip" role="tooltip"></div>
