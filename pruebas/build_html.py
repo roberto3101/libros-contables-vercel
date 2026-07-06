@@ -18,14 +18,37 @@ BEF=branches(PROJ+"/Ct_Pro_PLE_20260701.sql.bak")
 AFT=branches(PROJ+"/Ct_Pro_PLE_20260701.sql")
 
 # ---------- descargables (base64) ----------
-def b64(path):
-    return base64.b64encode(io.open(path,encoding="utf-8").read().encode("utf-8")).decode()
-ramas_sql = "/* Ramas refactorizadas 3.8/3.9/3.11/3.12/3.13 del SP Ct_Pro_PLE (version DESPUES) */\n\n" + "\n\n".join(AFT[k] for k in ['030800','030900','031100','031200','031300'])
-DL = {
-  "PLE_TEST_db.sql": base64.b64encode(io.open(SCR+"/schema.sql",encoding="utf-8").read().encode()).decode(),
-  "pruebas.sql":     base64.b64encode(io.open(SCR+"/test_bodies.sql",encoding="utf-8").read().encode()).decode(),
-  "ramas_despues.sql": base64.b64encode(ramas_sql.encode()).decode(),
+def enc(s): return base64.b64encode(s.encode("utf-8")).decode()
+ORDER=['030800','030900','031100','031200','031300']
+BOOK = {
+ '030800': ("3.8","Cuenta 30 — Inversiones Mobiliarias","Detalle del saldo de la cuenta 30"),
+ '030900': ("3.9","Cuenta 34 — Intangibles","Detalle del saldo de la cuenta 34"),
+ '031100': ("3.11","Cuenta 41 — Remuneraciones y Participaciones por Pagar","Detalle del saldo de la cuenta 41"),
+ '031200': ("3.12","Cuentas 42 y 43 — Cuentas por Pagar Comerciales","Detalle del saldo de las cuentas 42/43"),
+ '031300': ("3.13","Cuentas 46 y 47 — Cuentas por Pagar Diversas","Detalle del saldo de las cuentas 46/47"),
 }
+DL_FILE = {
+ '030800':"libro_3.8_cuenta_30.sql", '030900':"libro_3.9_cuenta_34.sql",
+ '031100':"libro_3.11_cuenta_41.sql", '031200':"libro_3.12_cuentas_42-43.sql",
+ '031300':"libro_3.13_cuentas_46-47.sql",
+}
+def perbook_sql(acc):
+    num,titulo,sub=BOOK[acc]
+    hdr=("/* =====================================================================\n"
+         "   PLE Libro 3 - Formato %s  (%s)\n"
+         "   Rama @Accion='%s' del stored procedure Ct_Pro_PLE (BD CodeplexWeb_2020).\n"
+         "   Contiene UNICAMENTE este libro; no modifica los demas formatos del SP.\n"
+         "   ===================================================================== */\n\n") % (num, titulo, acc)
+    return hdr+AFT[acc]
+global_sql=("/* =====================================================================\n"
+   "   PLE Libro 3 - Los 5 formatos ASIGNADOS: 3.8, 3.9, 3.11, 3.12, 3.13\n"
+   "   Ramas del stored procedure Ct_Pro_PLE (BD CodeplexWeb_2020).\n"
+   "   Solo estos libros; NO tocan los demas (~40) formatos del procedimiento.\n"
+   "   ===================================================================== */\n\n"
+   + "\n\n\n".join(AFT[k] for k in ORDER))
+SCHEMA_B64 = enc(io.open(SCR+"/schema.sql",encoding="utf-8").read())
+GLOBAL_B64 = enc(global_sql)
+PERBOOK_B64 = {a: enc(perbook_sql(a)) for a in ORDER}
 
 # ---------- metadata de formatos ----------
 BOOK = {
@@ -40,7 +63,7 @@ BOOK = {
 DESC = {
  '030800': dict(
    fuente="ct_diarios (cuentas 30x) + LEFT JOIN zg_auxiliares para el emisor del título.",
-   grano="Un registro por asiento (CUO) y emisor; el costo total es SUM(debe − haber) = saldo deudor (activo).",
+   grano="Un registro por asiento contable y emisor; el costo total es SUM(debe − haber) = saldo deudor (activo).",
    cambios=[
      "El original filtraba <code>left(idcuenta,2)='14'</code> (bug: cuenta equivocada) → corregido a <code>idcuenta like '30%'</code>.",
      "Se añadió la salida dual TXT / Excel (antes sólo devolvía un SELECT crudo).",
@@ -48,22 +71,22 @@ DESC = {
    todos=["Campos 7–9 y 11 (código de título, valor nominal, cantidad, provisión): el sistema no captura datos de títulos → salen en '00' / '0.00'. Confirmar fuente."]),
  '030900': dict(
    fuente="ct_diarios (cuentas 34x) + INNER JOIN ct_activo_fijo (descripción y valor contable).",
-   grano="Un registro por asiento (CUO) e intangible.",
+   grano="Un registro por asiento contable e intangible.",
    cambios=[
      "Campo 4 pasa a ser la fecha de inicio de operación con formato DD/MM/AAAA.",
-     "Se unificó el correlativo AMC (el original arrastraba dos columnas).",
+     "Se unificó el correlativo del asiento (el original arrastraba dos columnas).",
      "Salida dual TXT / Excel, SARGable y estado 1/8/9."],
    todos=["Campo 8 (amortización acumulada, debe ser negativa): falta la fuente real (cuenta 39 asociada o campo de ct_activo_fijo) → sale en 0.00. Confirmar."]),
  '031100': dict(
    fuente="ct_diarios (cuentas 41x) + INNER JOIN zg_auxiliares (datos del trabajador).",
-   grano="Un registro por asiento (CUO) y trabajador.",
+   grano="Un registro por asiento contable y trabajador.",
    cambios=[
      "Saldo final = SUM(haber − debe) → POSITIVO como exige el layout (el original daba negativo).",
      "Salida dual TXT / Excel, SARGable, saneamiento de texto y estado 1/8/9."],
    todos=[]),
  '031200': dict(
    fuente="ct_diarios (cuentas 42x y 43x) + INNER JOIN zg_proveedores.",
-   grano="Un registro por asiento (CUO) y proveedor.",
+   grano="Un registro por asiento contable y proveedor.",
    cambios=[
      "Monto por pagar = SUM(haber − debe) → POSITIVO (el original daba negativo).",
      "Campo 6 es la fecha de emisión del comprobante en formato DD/MM/AAAA.",
@@ -71,74 +94,74 @@ DESC = {
    todos=[]),
  '031300': dict(
    fuente="ct_diarios (cuentas 46x y 47x) + INNER JOIN zg_proveedores.",
-   grano="Un registro por asiento (CUO), tercero y cuenta contable.",
+   grano="Un registro por asiento contable, tercero y cuenta contable.",
    cambios=[
      "Monto pendiente = SUM(haber − debe) → POSITIVO. Incluye el código de cuenta contable (campo 8).",
      "Salida dual TXT / Excel, SARGable y estado 1/8/9."],
    todos=["Se asume que la contraparte es proveedor (como el código original). Confirmar si puede ser cliente/auxiliar."]),
 }
 
-# campos por formato: (num, etiqueta corta, descripcion completa SUNAT)
+# campos por formato: (num, etiqueta ubicua, descripcion completa SUNAT)
 F = {
  '030800': [
-  (1,"Periodo","Periodo del libro en formato AAAAMMDD (el día se registra como '00'). Debe ser menor o igual al periodo informado."),
-  (2,"CUO","Código Único de la Operación: llave del asiento contable, idéntica a la del Libro Diario."),
-  (3,"Correlativo (AMC)","Número correlativo del asiento. El primer dígito es A (apertura), M (movimiento del mes) o C (cierre)."),
-  (4,"Tipo doc. emisor","Tipo de documento de identidad del emisor del título (Tabla 2). Si no existe se registra '0'."),
-  (5,"Nº doc. emisor","Número de documento de identidad del emisor. Si no existe se registra '0'."),
-  (6,"Razón social emisor","Apellidos y nombres, denominación o razón social del emisor. Saneado de tabs/saltos de línea."),
-  (7,"Código del título","Tipo de título según Tabla 15. TODO: el sistema no captura este dato → '00'."),
-  (8,"Valor nominal","Valor nominal unitario del título. TODO: sin fuente → 0.00."),
+  (1,"Periodo tributario","Periodo del libro en formato AAAAMMDD (el día se registra como '00'). Debe ser menor o igual al periodo informado."),
+  (2,"Código único de operación","Código Único de la Operación: llave del asiento contable, idéntica a la del Libro Diario. Alias en el SP: codigo_unico_operacion (lee la columna existente d.cuo)."),
+  (3,"Correlativo del asiento","Número correlativo del asiento. El primer dígito es A (apertura), M (movimiento del mes) o C (cierre)."),
+  (4,"Tipo documento identidad emisor","Tipo de documento de identidad del emisor del título (Tabla 2). Si no existe se registra '0'."),
+  (5,"Número documento identidad emisor","Número de documento de identidad del emisor. Si no existe se registra '0'."),
+  (6,"Razón social del emisor","Apellidos y nombres, denominación o razón social del emisor. Saneado de tabs/saltos de línea."),
+  (7,"Código tipo de título","Tipo de título según Tabla 15. TODO: el sistema no captura este dato → '00'."),
+  (8,"Valor nominal unitario","Valor nominal unitario del título. TODO: sin fuente → 0.00."),
   (9,"Cantidad de títulos","Cantidad de títulos. TODO: sin fuente → 0."),
-  (10,"Costo total","Valor en libros: costo total de los títulos. Positivo o 0.00. Calculado como SUM(debe − haber)."),
-  (11,"Provisión total","Valor en libros: provisión total. Negativo o 0.00. TODO: sin fuente → 0.00."),
-  (12,"Estado","Estado de la operación: 1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
+  (10,"Costo total en libros","Valor en libros: costo total de los títulos. Positivo o 0.00. Calculado como SUM(debe − haber)."),
+  (11,"Provisión total en libros","Valor en libros: provisión total. Negativo o 0.00. TODO: sin fuente → 0.00."),
+  (12,"Estado de operación","Estado de la operación: 1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
  ],
  '030900': [
-  (1,"Periodo","Periodo AAAAMMDD (día '00'). Menor o igual al periodo informado."),
-  (2,"CUO","Código Único de la Operación, igual al del Libro Diario."),
-  (3,"Correlativo (AMC)","Correlativo del asiento; primer dígito A / M / C."),
-  (4,"Fecha inicio operación","Fecha de inicio de la operación en formato DD/MM/AAAA."),
-  (5,"Cuenta contable","Código de la cuenta contable (34…) al máximo nivel de dígitos utilizado."),
-  (6,"Descripción intangible","Descripción del intangible. Saneada de tabs/saltos de línea, hasta 40 caracteres."),
-  (7,"Valor contable","Valor contable del intangible. Positivo o 0.00."),
-  (8,"Amortización acumulada","Amortización contable acumulada. Negativo o 0.00. TODO: confirmar fuente → 0.00."),
-  (9,"Estado","1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
+  (1,"Periodo tributario","Periodo AAAAMMDD (día '00'). Menor o igual al periodo informado."),
+  (2,"Código único de operación","Código Único de la Operación, igual al del Libro Diario. Alias en el SP: codigo_unico_operacion (lee d.cuo)."),
+  (3,"Correlativo del asiento","Correlativo del asiento; primer dígito A / M / C."),
+  (4,"Fecha inicio de operación","Fecha de inicio de la operación en formato DD/MM/AAAA."),
+  (5,"Código de cuenta contable","Código de la cuenta contable (34…) al máximo nivel de dígitos utilizado."),
+  (6,"Descripción del intangible","Descripción del intangible. Saneada de tabs/saltos de línea, hasta 40 caracteres."),
+  (7,"Valor contable del intangible","Valor contable del intangible. Positivo o 0.00."),
+  (8,"Amortización contable acumulada","Amortización contable acumulada. Negativo o 0.00. TODO: confirmar fuente → 0.00."),
+  (9,"Estado de operación","1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
  ],
  '031100': [
-  (1,"Periodo","Periodo AAAAMMDD (día '00')."),
-  (2,"CUO","Código Único de la Operación, igual al del Libro Diario."),
-  (3,"Correlativo (AMC)","Correlativo del asiento; primer dígito A / M / C."),
-  (4,"Cuenta contable","Código de la cuenta contable de la obligación (41…)."),
-  (5,"Tipo doc. trabajador","Tipo de documento de identidad del trabajador (Tabla 2)."),
-  (6,"Nº doc. trabajador","Número de documento de identidad del trabajador."),
-  (7,"Código trabajador","Código interno del trabajador."),
-  (8,"Apellidos y nombres","Apellidos y nombres del trabajador. Saneado de tabs/saltos de línea."),
-  (9,"Saldo final","Saldo final de la cuenta por pagar. Positivo o 0.00. Calculado como SUM(haber − debe)."),
-  (10,"Estado","1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
+  (1,"Periodo tributario","Periodo AAAAMMDD (día '00')."),
+  (2,"Código único de operación","Código Único de la Operación, igual al del Libro Diario. Alias: codigo_unico_operacion (lee d.cuo)."),
+  (3,"Correlativo del asiento","Correlativo del asiento; primer dígito A / M / C."),
+  (4,"Código de cuenta contable","Código de la cuenta contable de la obligación (41…)."),
+  (5,"Tipo documento identidad trabajador","Tipo de documento de identidad del trabajador (Tabla 2)."),
+  (6,"Número documento identidad trabajador","Número de documento de identidad del trabajador."),
+  (7,"Código del trabajador","Código interno del trabajador."),
+  (8,"Apellidos y nombres del trabajador","Apellidos y nombres del trabajador. Saneado de tabs/saltos de línea."),
+  (9,"Saldo final por pagar","Saldo final de la cuenta por pagar. Positivo o 0.00. Calculado como SUM(haber − debe)."),
+  (10,"Estado de operación","1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
  ],
  '031200': [
-  (1,"Periodo","Periodo AAAAMMDD (día '00')."),
-  (2,"CUO","Código Único de la Operación, igual al del Libro Diario."),
-  (3,"Correlativo (AMC)","Correlativo del asiento; primer dígito A / M / C."),
-  (4,"Tipo doc. proveedor","Tipo de documento de identidad del proveedor (Tabla 2)."),
-  (5,"Nº doc. proveedor","Número de documento de identidad del proveedor."),
-  (6,"Fecha de emisión","Fecha de emisión del comprobante de pago, formato DD/MM/AAAA."),
-  (7,"Razón social proveedor","Apellidos y nombres, denominación o razón social del proveedor. Saneado."),
-  (8,"Monto por pagar","Monto de cada cuenta por pagar al proveedor. Positivo o 0.00. SUM(haber − debe)."),
-  (9,"Estado","1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
+  (1,"Periodo tributario","Periodo AAAAMMDD (día '00')."),
+  (2,"Código único de operación","Código Único de la Operación, igual al del Libro Diario. Alias: codigo_unico_operacion (lee d.cuo)."),
+  (3,"Correlativo del asiento","Correlativo del asiento; primer dígito A / M / C."),
+  (4,"Tipo documento identidad proveedor","Tipo de documento de identidad del proveedor (Tabla 2)."),
+  (5,"Número documento identidad proveedor","Número de documento de identidad del proveedor."),
+  (6,"Fecha de emisión del comprobante","Fecha de emisión del comprobante de pago, formato DD/MM/AAAA."),
+  (7,"Razón social del proveedor","Apellidos y nombres, denominación o razón social del proveedor. Saneado."),
+  (8,"Monto de cuenta por pagar","Monto de cada cuenta por pagar al proveedor. Positivo o 0.00. SUM(haber − debe)."),
+  (9,"Estado de operación","1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
  ],
  '031300': [
-  (1,"Periodo","Periodo AAAAMMDD (día '00')."),
-  (2,"CUO","Código Único de la Operación, igual al del Libro Diario."),
-  (3,"Correlativo (AMC)","Correlativo del asiento; primer dígito A / M / C."),
-  (4,"Tipo doc. tercero","Tipo de documento de identidad del tercero (Tabla 2)."),
-  (5,"Nº doc. tercero","Número de documento de identidad del tercero."),
-  (6,"Fecha emisión / inicio","Fecha de emisión del comprobante o de inicio de la operación, DD/MM/AAAA."),
-  (7,"Apellidos y nombres","Apellidos y nombres de terceros. Saneado de tabs/saltos de línea."),
-  (8,"Cuenta contable","Código de la cuenta contable de la obligación (46/47…)."),
-  (9,"Monto pendiente","Monto pendiente de pago al tercero. Positivo o 0.00. SUM(haber − debe)."),
-  (10,"Estado","1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
+  (1,"Periodo tributario","Periodo AAAAMMDD (día '00')."),
+  (2,"Código único de operación","Código Único de la Operación, igual al del Libro Diario. Alias: codigo_unico_operacion (lee d.cuo)."),
+  (3,"Correlativo del asiento","Correlativo del asiento; primer dígito A / M / C."),
+  (4,"Tipo documento identidad tercero","Tipo de documento de identidad del tercero (Tabla 2)."),
+  (5,"Número documento identidad tercero","Número de documento de identidad del tercero."),
+  (6,"Fecha de emisión del comprobante","Fecha de emisión del comprobante o de inicio de la operación, DD/MM/AAAA."),
+  (7,"Apellidos y nombres del tercero","Apellidos y nombres de terceros. Saneado de tabs/saltos de línea."),
+  (8,"Código de cuenta contable","Código de la cuenta contable de la obligación (46/47…)."),
+  (9,"Monto pendiente de pago","Monto pendiente de pago al tercero. Positivo o 0.00. SUM(haber − debe)."),
+  (10,"Estado de operación","1 = del periodo, 8 = anterior no anotada, 9 = anterior anotada. Por defecto 1."),
  ],
 }
 
@@ -203,7 +226,13 @@ def section(acc):
 
 tabs=''.join(f'<button class="tab{" is-active" if i==0 else ""}" data-target="{acc}">{e(BOOK[acc][0])}<span>{e(BOOK[acc][1].split("—")[0].strip())}</span></button>' for i,acc in enumerate(ORDER))
 sections=''.join(section(a) for a in ORDER)
-downloads=''.join(f'<a class="dl" download="{name}" href="data:application/sql;base64,{data}"><span class="dl-ic">↓</span><span class="dl-t">{name}</span><span class="dl-s">{["Base de datos de prueba (tablas + datos)","Script de pruebas (5 ramas)","Ramas refactorizadas (después)"][i]}</span></a>' for i,(name,data) in enumerate(DL.items()))
+def dlcard(name,title,sub,data,cls=""):
+    return f'<a class="dl {cls}" download="{name}" href="data:application/sql;base64,{data}"><span class="dl-ic">↓</span><span class="dl-t">{e(title)}</span><span class="dl-s">{e(sub)}</span></a>'
+global_cards=(dlcard("libros_3.8_a_3.13_asignados.sql","Los 5 libros asignados","Solo 3.8 / 3.9 / 3.11 / 3.12 / 3.13 — no toca los demás",GLOBAL_B64,"dl-global")
+             +dlcard("PLE_TEST_db.sql","Base de datos de prueba","Tablas mock + datos de casos borde para reproducir",SCHEMA_B64))
+perbook_cards=''.join(dlcard(DL_FILE[a], BOOK[a][0]+" · "+BOOK[a][1].split("—")[1].strip(), "Rama del SP · solo este libro", PERBOOK_B64[a]) for a in ORDER)
+downloads=(f'<div class="dl-group"><span class="dl-label">Descarga global</span><div class="dl-row">{global_cards}</div></div>'
+           f'<div class="dl-group"><span class="dl-label">Descarga por libro</span><div class="dl-row dl-row-5">{perbook_cards}</div></div>')
 
 HTML=f'''<title>PLE Libro 3 · Ct_Pro_PLE — 5 formatos</title>
 <style>
@@ -232,7 +261,11 @@ h1{{font-family:var(--serif);font-weight:600;font-size:clamp(28px,4vw,44px);line
 .pill .dot{{width:7px;height:7px;border-radius:50%;background:currentColor}}
 
 /* downloads */
-.downloads{{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:22px}}
+.downloads{{display:flex;flex-direction:column;gap:16px;margin-top:22px}}
+.dl-label{{display:block;font:600 10.5px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:9px}}
+.dl-row{{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}}
+.dl-row-5{{grid-template-columns:repeat(auto-fit,minmax(175px,1fr))}}
+.dl-global{{border-color:var(--accent);background:#F1FAF7}}
 .dl{{display:flex;flex-direction:column;gap:2px;text-decoration:none;color:var(--ink);border:1px solid var(--line);background:var(--card);border-radius:12px;padding:14px 16px;transition:border-color .15s,transform .15s,box-shadow .15s}}
 .dl:hover{{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px -14px rgba(11,110,99,.5)}}
 .dl:focus-visible{{outline:2px solid var(--accent);outline-offset:2px}}
