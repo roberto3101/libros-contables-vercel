@@ -24,10 +24,10 @@ GO
 -- Maestros
 INSERT INTO zg_auxiliares VALUES
  ('1-TEST','20111111111','6','INVERSIONES XYZ SAC','A001'),
- ('1-TEST','10222222222','1','JUAN PEREZ LOPEZ','T001');
+ ('1-TEST','10222222','1','JUAN PEREZ LOPEZ','T001');
 -- razon social SUCIA: trae TAB + CR + LF embebidos (caso real que rompe el TXT si no se limpia)
 INSERT INTO zg_proveedores VALUES
- ('1-TEST','20333333333','6','PROVEEDOR'+CHAR(9)+'COMERCIAL'+CHAR(13)+CHAR(10)+'SAC'),
+ ('1-TEST','20333333333','6','PROVEEDOR'+CHAR(9)+'COMERCIAL'+CHAR(13)+CHAR(10)+'S/A \ SAC'),
  ('1-TEST','20444444444','6','SERVICIOS DIVERSOS EIRL');
 INSERT INTO ct_activo_fijo VALUES
  ('1-TEST',1,'2026','SOFTWARE CONTABLE ERP',12000.00);
@@ -43,7 +43,7 @@ INSERT INTO ct_diarios VALUES
  ('1-TEST','2026','202606','3411','AS-34-01','M002','2026-06-15',12000,0,  1,NULL,NULL,NULL,1);
 -- 3.11 cuenta 41: saldo acreedor (haber>debe) => positivo 3000. estado NULL => debe salir '1'
 INSERT INTO ct_diarios VALUES
- ('1-TEST','2026','202606','4111','AS-41-01','M003','2026-06-30',0,3000,   NULL,'10222222222',NULL,NULL,NULL);
+ ('1-TEST','2026','202606','4111','AS-41-01','M003','2026-06-30',0,3000,   NULL,'10222222',NULL,NULL,NULL);
 -- 3.12 cuentas 42 y 43: prov 20333. 42 con estado 8 (debe preservarse). 43 incluida.
 INSERT INTO ct_diarios VALUES
  ('1-TEST','2026','202606','4212','AS-42-01','M004','2026-06-10',0,8000,   8,NULL,'20333333333',NULL,NULL),

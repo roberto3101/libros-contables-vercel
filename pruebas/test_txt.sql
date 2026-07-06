@@ -1,12 +1,9 @@
 SET NOCOUNT ON;
 USE PLE_TEST;
 GO
------------------------------------------------------------------
--- LIBRO DE INVENTARIOS Y BALANCES - DETALLE DEL SALDO DE LA CUENTA 30 INVERSIONES MOBILIARIAS (3.8)
------------------------------------------------------------------
+PRINT '###030800###';
 DECLARE @idempresa varchar(100)='1-TEST';
 DECLARE @periodo varchar(6)='202606';
-DECLARE @exportar_excel bit=0;
 if object_id('tempdb..#inv_balances_030800') is not null drop table #inv_balances_030800;
 select periodo_tributario,codigo_unico_operacion,correlativo_asiento_contable,tipo_documento_identidad_emisor,numero_documento_identidad_emisor,razon_social_emisor,codigo_tipo_titulo,valor_nominal_unitario_titulo,cantidad_titulos,costo_total_titulos_en_libros,provision_total_titulos_en_libros,estado_operacion,campo_libre_utilizacion
 into #inv_balances_030800
@@ -27,16 +24,11 @@ from (	select d.periodo+'00' as periodo_tributario,
 			where d.idempresa=@idempresa and d.idaniopro=left(@periodo,4) and d.periodo=@periodo and d.idcuenta like '30%'
 			group by d.periodo,d.cuo,d.amc,c.idtipodocidentidad,c.rucdni,c.razonsocial,d.estado_sunat
 		) t
-
 select concat(periodo_tributario,'|',codigo_unico_operacion,'|',correlativo_asiento_contable,'|',tipo_documento_identidad_emisor,'|',numero_documento_identidad_emisor,'|',razon_social_emisor,'|',codigo_tipo_titulo,'|',valor_nominal_unitario_titulo,'|',cantidad_titulos,'|',costo_total_titulos_en_libros,'|',provision_total_titulos_en_libros,'|',estado_operacion) as PLE from #inv_balances_030800 order by codigo_unico_operacion, correlativo_asiento_contable;
 GO
-
------------------------------------------------------------------
--- LIBRO DE INVENTARIOS Y BALANCES - DETALLE DEL SALDO DE LA CUENTA 34 - INTANGIBLES (3.9)
------------------------------------------------------------------
+PRINT '###030900###';
 DECLARE @idempresa varchar(100)='1-TEST';
 DECLARE @periodo varchar(6)='202606';
-DECLARE @exportar_excel bit=0;
 if object_id('tempdb..#inv_balances_030900') is not null drop table #inv_balances_030900;
 select periodo_tributario,codigo_unico_operacion,correlativo_asiento_contable,fecha_inicio_operacion,codigo_cuenta_contable,descripcion_intangible,valor_contable_intangible,amortizacion_contable_acumulada,estado_operacion,campo_libre_utilizacion
 into #inv_balances_030900
@@ -54,16 +46,11 @@ from (	select d.periodo+'00' as periodo_tributario,
 			where d.idempresa=@idempresa and d.idaniopro=left(@periodo,4) and d.periodo=@periodo and d.idcuenta like '34%'
 			group by d.periodo,d.cuo,d.amc,d.fecha_contable,d.idcuenta,af.descripcion,af.valor_activo_mna,d.estado_sunat
 		) t
-
 select concat(periodo_tributario,'|',codigo_unico_operacion,'|',correlativo_asiento_contable,'|',fecha_inicio_operacion,'|',codigo_cuenta_contable,'|',descripcion_intangible,'|',valor_contable_intangible,'|',amortizacion_contable_acumulada,'|',estado_operacion) as PLE from #inv_balances_030900 order by codigo_unico_operacion, correlativo_asiento_contable, codigo_cuenta_contable;
 GO
-
------------------------------------------------------------------
--- LIBRO DE INVENTARIOS Y BALANCES - DETALLE DEL SALDO DE LA CUENTA 41 REMUNERACIONES Y PARTICIPACIONES POR PAGAR (3.11)
------------------------------------------------------------------
+PRINT '###031100###';
 DECLARE @idempresa varchar(100)='1-TEST';
 DECLARE @periodo varchar(6)='202606';
-DECLARE @exportar_excel bit=0;
 if object_id('tempdb..#inv_balances_031100') is not null drop table #inv_balances_031100;
 select periodo_tributario,codigo_unico_operacion,correlativo_asiento_contable,codigo_cuenta_contable,tipo_documento_identidad_trabajador,numero_documento_identidad_trabajador,codigo_trabajador,apellidos_nombres_trabajador,saldo_final_por_pagar,estado_operacion,campo_libre_utilizacion
 into #inv_balances_031100
@@ -82,16 +69,11 @@ from (	select d.periodo+'00' as periodo_tributario,
 			where d.idempresa=@idempresa and d.idaniopro=left(@periodo,4) and d.periodo=@periodo and d.idcuenta like '41%'
 			group by d.periodo,d.cuo,d.amc,d.idcuenta,ax.idtipodocidentidad,ax.rucdni,ax.codigo,ax.razonsocial,d.estado_sunat
 		) t
-
 select concat(periodo_tributario,'|',codigo_unico_operacion,'|',correlativo_asiento_contable,'|',codigo_cuenta_contable,'|',tipo_documento_identidad_trabajador,'|',numero_documento_identidad_trabajador,'|',codigo_trabajador,'|',apellidos_nombres_trabajador,'|',saldo_final_por_pagar,'|',estado_operacion) as PLE from #inv_balances_031100 order by codigo_unico_operacion, correlativo_asiento_contable, codigo_cuenta_contable;
 GO
-
------------------------------------------------------------------
--- LIBRO DE INVENTARIOS Y BALANCES - DETALLE DEL SALDO DE LAS CUENTAS 42 Y 43 CUENTAS POR PAGAR COMERCIALES (3.12)
------------------------------------------------------------------
+PRINT '###031200###';
 DECLARE @idempresa varchar(100)='1-TEST';
 DECLARE @periodo varchar(6)='202606';
-DECLARE @exportar_excel bit=0;
 if object_id('tempdb..#inv_balances_031200') is not null drop table #inv_balances_031200;
 select periodo_tributario,codigo_unico_operacion,correlativo_asiento_contable,tipo_documento_identidad_proveedor,numero_documento_identidad_proveedor,fecha_emision_comprobante,razon_social_proveedor,monto_cuenta_por_pagar,estado_operacion,campo_libre_utilizacion
 into #inv_balances_031200
@@ -109,16 +91,11 @@ from (	select d.periodo+'00' as periodo_tributario,
 			where d.idempresa=@idempresa and d.idaniopro=left(@periodo,4) and d.periodo=@periodo and (d.idcuenta like '42%' or d.idcuenta like '43%')
 			group by d.periodo,d.cuo,d.amc,ax.idtipodocidentidad,ax.rucdni,d.fecha_contable,ax.razonsocial,d.estado_sunat
 		) t
-
 select concat(periodo_tributario,'|',codigo_unico_operacion,'|',correlativo_asiento_contable,'|',tipo_documento_identidad_proveedor,'|',numero_documento_identidad_proveedor,'|',fecha_emision_comprobante,'|',razon_social_proveedor,'|',monto_cuenta_por_pagar,'|',estado_operacion) as PLE from #inv_balances_031200 order by codigo_unico_operacion, correlativo_asiento_contable;
 GO
-
------------------------------------------------------------------
--- LIBRO DE INVENTARIOS Y BALANCES - DETALLE DEL SALDO DE LAS CUENTAS 46 Y 47 CUENTAS POR PAGAR DIVERSAS (3.13)
------------------------------------------------------------------
+PRINT '###031300###';
 DECLARE @idempresa varchar(100)='1-TEST';
 DECLARE @periodo varchar(6)='202606';
-DECLARE @exportar_excel bit=0;
 if object_id('tempdb..#inv_balances_031300') is not null drop table #inv_balances_031300;
 select periodo_tributario,codigo_unico_operacion,correlativo_asiento_contable,tipo_documento_identidad_tercero,numero_documento_identidad_tercero,fecha_emision_comprobante,apellidos_nombres_tercero,codigo_cuenta_contable,monto_pendiente_pago_tercero,estado_operacion,campo_libre_utilizacion
 into #inv_balances_031300
@@ -137,7 +114,5 @@ from (	select d.periodo+'00' as periodo_tributario,
 			where d.idempresa=@idempresa and d.idaniopro=left(@periodo,4) and d.periodo=@periodo and (d.idcuenta like '46%' or d.idcuenta like '47%')
 			group by d.periodo,d.cuo,d.amc,ax.idtipodocidentidad,ax.rucdni,d.fecha_contable,ax.razonsocial,d.idcuenta,d.estado_sunat
 		) t
-
 select concat(periodo_tributario,'|',codigo_unico_operacion,'|',correlativo_asiento_contable,'|',tipo_documento_identidad_tercero,'|',numero_documento_identidad_tercero,'|',fecha_emision_comprobante,'|',apellidos_nombres_tercero,'|',codigo_cuenta_contable,'|',monto_pendiente_pago_tercero,'|',estado_operacion) as PLE from #inv_balances_031300 order by codigo_unico_operacion, correlativo_asiento_contable, codigo_cuenta_contable;
 GO
-

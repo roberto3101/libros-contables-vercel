@@ -11,8 +11,12 @@ T = "\t"
 ESTADO = "case when isnull(d.estado_sunat,0) in (1,8,9) then d.estado_sunat else 1 end"
 
 def clean(expr, n):
-    # quita TAB/CR/LF que romperian el TXT en palotes y recorta al maximo del layout
-    return "REPLACE(REPLACE(REPLACE(left(%s,%d),CHAR(9),''),CHAR(10),''),CHAR(13),'')" % (expr, n)
+    # Regla General SUNAT 2.0: el texto no debe contener | / \ ; ademas se quitan TAB/CR/LF
+    # que romperian el TXT en palotes. Todo se reemplaza por espacio. Recorta al maximo del layout.
+    x = "left(%s,%d)" % (expr, n)
+    for ch in ["CHAR(9)","CHAR(10)","CHAR(13)","'|'","'/'","'\\'"]:
+        x = "REPLACE(%s,%s,' ')" % (x, ch)
+    return x
 
 def build(temp, pairs, frm, where, group, order_cols):
     # pairs: (expr_fuente, alias_ubicuo[, comentario])
